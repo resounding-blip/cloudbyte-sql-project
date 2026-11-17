@@ -63,7 +63,7 @@ The eleven tables of `cloudbyte`, one heading each, in the order `schema.sql` de
 | `contact_id` | the contact's number, from `701` to `787` | `SELECT min(contact_id), max(contact_id), min(customer_ref), max(customer_ref), count(*) FROM contacts;` |
 | `customer_ref` | a customer number, from `1` to `40`; the foreign key `fk_contacts_customer` requires each to be a `customers.customer_id` | `SELECT min(contact_id), max(contact_id), min(customer_ref), max(customer_ref), count(*) FROM contacts;` |
 | `full_name` | a person's first and last name, such as `Jörg Baumgart`; the unique constraint `uq_contacts_customer_name` refuses the same name twice under one customer | `SELECT * FROM contacts ORDER BY contact_id LIMIT 3;` |
-| `email` | the person's email address, `first.last@company.example` | `SELECT * FROM contacts ORDER BY contact_id LIMIT 3;` |
+| `email` | the person's email address, shaped `first.last@company.example`; 0 addresses have another shape, `SELECT count(*) AS other_shape FROM contacts WHERE email !~ '^[^@. ]+\.[^@. ]+@[^@. ]+\.example$';` | `SELECT * FROM contacts ORDER BY contact_id LIMIT 3;` |
 | `role` | one of three roles: `admin` 28, `billing` 28, `technical` 26 | `SELECT role, count(*) FROM contacts GROUP BY role ORDER BY role;` |
 
 ## tickets
@@ -78,7 +78,7 @@ The eleven tables of `cloudbyte`, one heading each, in the order `schema.sql` de
 | `st_flag_2` | **Not proved:** a number from 1 to 4 that looks like how slow a ticket was to resolve. Per value, `resolved_minutes` runs: `1` 232 tickets, 20 to 239; `2` 223, 129 to 1440; `3` 245, 604 to 7157; `4` 215, 1496 to 20045. The ranges overlap, so no rule sets it | `SELECT st_flag_2, count(*), min(resolved_minutes), max(resolved_minutes) FROM tickets GROUP BY st_flag_2 ORDER BY st_flag_2;` |
 | `opened_at` | when the ticket was opened, from `2024-01-02 11:14` to `2025-12-31 08:07` | `SELECT min(ticket_id), max(ticket_id), min(customer_ref), max(customer_ref), min(opened_at), max(opened_at), min(closed_at), max(closed_at), min(resolved_minutes), max(resolved_minutes), count(*) FROM tickets;` |
 | `closed_at` | when the ticket was closed, from `2024-01-03 13:19` to `2025-12-29 07:25`, blank while the ticket is open; the check constraint `ck_ticket_order` keeps it on or after `opened_at` | `SELECT min(ticket_id), max(ticket_id), min(customer_ref), max(customer_ref), min(opened_at), max(opened_at), min(closed_at), max(closed_at), min(resolved_minutes), max(resolved_minutes), count(*) FROM tickets;` |
-| `resolved_minutes` | minutes to resolve, from `20` to `20045`, filled on every closed ticket | `SELECT min(ticket_id), max(ticket_id), min(customer_ref), max(customer_ref), min(opened_at), max(opened_at), min(closed_at), max(closed_at), min(resolved_minutes), max(resolved_minutes), count(*) FROM tickets;` |
+| `resolved_minutes` | minutes to resolve, from `20` to `20045`, filled on every closed ticket: 71 tickets are open and 0 closed tickets lack it, `SELECT count(*) FILTER (WHERE closed_at IS NULL) AS open, count(*) FILTER (WHERE closed_at IS NOT NULL AND resolved_minutes IS NULL) AS closed_without_minutes FROM tickets;` | `SELECT min(ticket_id), max(ticket_id), min(customer_ref), max(customer_ref), min(opened_at), max(opened_at), min(closed_at), max(closed_at), min(resolved_minutes), max(resolved_minutes), count(*) FROM tickets;` |
 | `assigned_to` | a staff username, 12 names from `alice` 82 to `leo` 73 | `SELECT assigned_to, count(*) FROM tickets GROUP BY assigned_to ORDER BY assigned_to;` |
 
 ## ticket_notes
@@ -153,7 +153,7 @@ The closed tickets the average left out: `SELECT count(*) AS left_out FROM ticke
 
 Nothing in cloudbyte had been changed when this count was taken.
 
-The rule test: on the 743 closed tickets with a duration (`SELECT count(*) AS tickets_to_test FROM tickets WHERE closed_at IS NOT NULL AND resolved_minutes IS NOT NULL;`), all 743 have `resolved_minutes` equal to the whole minutes from `opened_at` to `closed_at` (`SELECT count(*) AS tickets_that_agree FROM tickets WHERE resolved_minutes = round(EXTRACT(EPOCH FROM (closed_at - opened_at)) / 60);`).
+The rule test, run after the orphan-tickets repair, which is why it covers 743 and not 751: on the 743 closed tickets with a duration (`SELECT count(*) AS tickets_to_test FROM tickets WHERE closed_at IS NOT NULL AND resolved_minutes IS NOT NULL;`), all 743 have `resolved_minutes` equal to the whole minutes from `opened_at` to `closed_at` (`SELECT count(*) AS tickets_that_agree FROM tickets WHERE resolved_minutes = round(EXTRACT(EPOCH FROM (closed_at - opened_at)) / 60);`).
 
 The count just before the repair was 101, not 103 (`SELECT count(*) AS left_out FROM tickets WHERE closed_at IS NOT NULL AND resolved_minutes IS NULL;`). The orphan repair deleted six tickets, and two of them were closed with a blank duration. The test-account repair removed none: after it, 103 were still blank (850 closed, 747 with a duration).
 
@@ -205,7 +205,7 @@ Nothing in cloudbyte had been changed when this count was taken.
 
 The old `closed_at` values, before the repair: ticket 3558 opened `2025-12-14 13:39:00`, closed `2025-12-14 08:39:00`; ticket 3740 opened `2025-03-21 10:06:00`, closed `2025-03-21 05:06:00`.
 
-The rule test: on the 741 tickets that aren't backwards and have a duration (`SELECT count(*) AS tickets_to_test FROM tickets WHERE closed_at >= opened_at AND resolved_minutes IS NOT NULL;`), all 741 have `closed_at` equal to `opened_at` plus `resolved_minutes` minutes (`SELECT count(*) AS tickets_that_agree FROM tickets WHERE closed_at >= opened_at AND resolved_minutes IS NOT NULL AND closed_at = opened_at + resolved_minutes * INTERVAL '1 minute';`).
+The rule test, run after the orphan-tickets repair, like the one under the blank `resolved_minutes` entry: on the 741 tickets that aren't backwards and have a duration (`SELECT count(*) AS tickets_to_test FROM tickets WHERE closed_at >= opened_at AND resolved_minutes IS NOT NULL;`), all 741 have `closed_at` equal to `opened_at` plus `resolved_minutes` minutes (`SELECT count(*) AS tickets_that_agree FROM tickets WHERE closed_at >= opened_at AND resolved_minutes IS NOT NULL AND closed_at = opened_at + resolved_minutes * INTERVAL '1 minute';`).
 
 The repair. The count just before it was still 2.
 
@@ -504,7 +504,7 @@ On a quiet database, when no session waits for a lock, the diagnosis query retur
 
 ## For a reader who does not read SQL
 
-The customer and support records we inherited had several faults: Berlin was typed three different ways, Acme GmbH was in the customer list twice, some contact people were listed twice under the same company, two test accounts sat among the real customers, six support tickets belonged to customers that did not exist, two tickets were closed five hours before they were opened, and 101 closed tickets had no time to resolve recorded. All of these are now fixed, and the database now refuses the same mistakes if anyone tries to make them again. One thing can't be fixed: we don't know when those two backwards tickets really closed, so their closing times are worked out from the time each one took, not taken from a record. Because of the repairs, we now count 40 customers instead of 43 and 915 tickets instead of 925, and the average time to resolve a closed ticket is now about 3,652 minutes, roughly two and a half days, where before the repairs it read about 3,571 minutes, because it now counts every closed ticket.
+The customer and support records we inherited had several faults: Berlin was typed three different ways, Acme GmbH was in the customer list twice, some contact people were listed twice under the same company, two test accounts sat among the real customers, six support tickets belonged to customers that did not exist, two tickets were closed five hours before they were opened, and 101 closed tickets had no time to resolve recorded. All of these are now fixed. The database now refuses some of the same mistakes if anyone tries them again: the exact same company name twice, the same person twice under one company, a ticket that closes before it opens, a customer that is neither active nor churned, and a ticket, contact or website visit linked to a customer, ticket or contact that doesn't exist. It still lets in a closed ticket with no time to resolve, a new spelling of a city, and a test account, so those need checking by hand. One thing can't be fixed: we don't know when those two backwards tickets really closed, so their closing times are worked out from the time each one took, not taken from a record. Because of the repairs, we now count 40 customers instead of 43 and 915 tickets instead of 925, and the average time to resolve a closed ticket is now about 3,652 minutes, roughly two and a half days, where before the repairs it read about 3,571 minutes, because it now counts every closed ticket.
 
 ## Reproducing this
 
@@ -521,7 +521,7 @@ Put your instance's endpoint in place of `<host>` and your role's name in place 
 
 Where each step runs. Run the `CREATE DATABASE` statement in a psql session connected to `cloudbyte`, and stay connected there, because PostgreSQL won't drop a database your session is connected to. Run the `load.sql` command from the folder `cloudbyte-database`, the one that holds `load.sql`, `schema.sql` and the CSV files: `load.sql` reads them from the folder the terminal is in, and anywhere else it stops before it makes a table. Run the `changes.sql` command from this repository's folder.
 
-Where the files come from. `changes.sql` is in this repository. `load.sql` isn't: it is in the `cloudbyte-database` zip from the course's Section 1 handout, the same files `cloudbyte` was first loaded from.
+Where the files come from. `changes.sql` is in this repository. `load.sql` isn't: it is in the `cloudbyte-database` zip from the course's Section 1 handout, downloaded from https://wbscodingschool.github.io/cloud-courses/sql-project/downloads/cloudbyte-database.zip and unpacked to `~/cloudbyte-sql/cloudbyte-database/`, the same files `cloudbyte` was first loaded from.
 
 What the proof compared. On both `cloudbyte` and the fresh copy I ran one file of checks: the row count and the `\d` description (columns, `not null`, indexes and constraints) of each of the eleven inherited tables, and the check query of every entry under `## Corrections`. I saved each output to a file, and `diff` of the two files printed nothing.
 
