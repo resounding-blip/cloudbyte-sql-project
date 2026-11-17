@@ -108,3 +108,33 @@ The eleven tables of `cloudbyte`, one heading each, in the order `schema.sql` de
 | `duration_ms` | how long the request took in milliseconds, from `12` to `2400` | `SELECT min(hit_id), max(hit_id), min(customer_ref), max(customer_ref), min(contact_ref), max(contact_ref), min(hit_at), max(hit_at), min(duration_ms), max(duration_ms), count(*) FROM portal_hits;` |
 
 `portal_hits` stopped being filled early: its last visit is at `2025-11-28 20:57:12`, while the support desk's last ticket was opened at `2025-12-31 08:07:00`, so the portal's visits from 29 November 2025 on are missing. Found with `SELECT max(hit_at) AS last_hit FROM portal_hits;` and `SELECT max(opened_at) AS last_ticket FROM tickets;`
+
+## Relationships
+
+| relationship | `INNER JOIN` rows | `LEFT JOIN` rows | the queries that proved it |
+|---|---|---|---|
+| `contacts.customer_ref` → `customers.customer_id` | 87 | 87 | `SELECT count(*) AS inner_join FROM contacts t JOIN customers c ON c.customer_id = t.customer_ref;` `SELECT count(*) AS left_join FROM contacts t LEFT JOIN customers c ON c.customer_id = t.customer_ref;` |
+| `tickets.customer_ref` → `customers.customer_id` | 919 | 925 | `SELECT count(*) AS inner_join FROM tickets t JOIN customers c ON c.customer_id = t.customer_ref;` `SELECT count(*) AS left_join FROM tickets t LEFT JOIN customers c ON c.customer_id = t.customer_ref;` |
+| `ticket_notes.ticket_id` → `tickets.ticket_id` | 3246 | 3246 | `SELECT count(*) AS inner_join FROM ticket_notes n JOIN tickets t ON t.ticket_id = n.ticket_id;` `SELECT count(*) AS left_join FROM ticket_notes n LEFT JOIN tickets t ON t.ticket_id = n.ticket_id;` |
+| `portal_hits.customer_ref` → `customers.customer_id` | 135877 | 135877 | `SELECT count(*) AS inner_join FROM portal_hits h JOIN customers c ON c.customer_id = h.customer_ref;` `SELECT count(*) AS left_join FROM portal_hits h LEFT JOIN customers c ON c.customer_id = h.customer_ref;` |
+| `portal_hits.contact_ref` → `contacts.contact_id` | 135877 | 135877 | `SELECT count(*) AS inner_join FROM portal_hits h JOIN contacts k ON k.contact_id = h.contact_ref;` `SELECT count(*) AS left_join FROM portal_hits h LEFT JOIN contacts k ON k.contact_id = h.contact_ref;` |
+
+`tickets` has 925 rows (`SELECT count(*) AS tickets FROM tickets;`). Joined to `ticket_notes` on `ticket_id`, it returns 3246 rows, one for each note (`SELECT count(*) AS after_join FROM tickets t JOIN ticket_notes n ON n.ticket_id = t.ticket_id;`).
+
+Declaring `tickets.customer_ref` → `customers.customer_id` as a foreign key is refused. The statement, as run:
+
+```sql
+ALTER TABLE tickets ADD CONSTRAINT fk_tickets_customer
+  FOREIGN KEY (customer_ref) REFERENCES customers (customer_id);
+```
+
+The engine's message:
+
+```text
+ERROR:  insert or update on table "tickets" violates foreign key constraint "fk_tickets_customer"
+DETAIL:  Key (customer_ref)=(44) is not present in table "customers".
+```
+
+Two tickets carry customer `44`: tickets `3920` and `3921` (`SELECT ticket_id, customer_ref FROM tickets WHERE customer_ref = 44 ORDER BY ticket_id;`).
+
+In all, 6 tickets are orphans, and they point at 3 customer numbers that `customers` doesn't hold (`SELECT count(*) AS orphan_tickets, count(DISTINCT t.customer_ref) AS missing_customers FROM tickets t LEFT JOIN customers c ON t.customer_ref = c.customer_id WHERE c.customer_id IS NULL;`).
