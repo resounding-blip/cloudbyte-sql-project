@@ -505,3 +505,26 @@ On a quiet database, when no session waits for a lock, the diagnosis query retur
 ## For a reader who does not read SQL
 
 The customer and support records we inherited had several faults: Berlin was typed three different ways, Acme GmbH was in the customer list twice, some contact people were listed twice under the same company, two test accounts sat among the real customers, six support tickets belonged to customers that did not exist, two tickets were closed five hours before they were opened, and 101 closed tickets had no time to resolve recorded. All of these are now fixed, and the database now refuses the same mistakes if anyone tries to make them again. One thing can't be fixed: we don't know when those two backwards tickets really closed, so their closing times are worked out from the time each one took, not taken from a record. Because of the repairs, we now count 40 customers instead of 43 and 915 tickets instead of 925, and the average time to resolve a closed ticket is now about 3,652 minutes, roughly two and a half days, where before the repairs it read about 3,571 minutes, because it now counts every closed ticket.
+
+## Reproducing this
+
+To build a fresh copy of this database, run these three steps in order:
+
+```
+CREATE DATABASE cloudbyte_fresh OWNER <user>
+  ENCODING 'UTF8' LOCALE_PROVIDER builtin BUILTIN_LOCALE 'C.UTF-8' TEMPLATE template0;
+psql -h <host> -U <user> -d cloudbyte_fresh -v ON_ERROR_STOP=1 -f load.sql
+psql -h <host> -U <user> -d cloudbyte_fresh -v ON_ERROR_STOP=1 -f changes.sql
+```
+
+Put your instance's endpoint in place of `<host>` and your role's name in place of `<user>`. psql asks for the password.
+
+Where each step runs. Run the `CREATE DATABASE` statement in a psql session connected to `cloudbyte`, and stay connected there, because PostgreSQL won't drop a database your session is connected to. Run the `load.sql` command from the folder `cloudbyte-database`, the one that holds `load.sql`, `schema.sql` and the CSV files: `load.sql` reads them from the folder the terminal is in, and anywhere else it stops before it makes a table. Run the `changes.sql` command from this repository's folder.
+
+Where the files come from. `changes.sql` is in this repository. `load.sql` isn't: it is in the `cloudbyte-database` zip from the course's Section 1 handout, the same files `cloudbyte` was first loaded from.
+
+What the proof compared. On both `cloudbyte` and the fresh copy I ran one file of checks: the row count and the `\d` description (columns, `not null`, indexes and constraints) of each of the eleven inherited tables, and the check query of every entry under `## Corrections`. I saved each output to a file, and `diff` of the two files printed nothing.
+
+What it doesn't prove. The proof compares counts, constraints and indexes, not the values in the rows, so a repair that set the right number of rows to a wrong value would still match.
+
+The one expected difference. `cloudbyte` has a twelfth table, `billing_export`, which the copy doesn't have. I made it in Section 1 from the six monthly spreadsheet exports; `load.sql` builds only the eleven inherited tables, and `changes.sql` never touches `billing_export`. A copy without it has not failed.
