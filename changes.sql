@@ -97,3 +97,9 @@ COMMIT;
 BEGIN;
 ALTER TABLE customers ADD CONSTRAINT ck_customer_status CHECK (status IN ('active', 'churned'));
 COMMIT;
+
+-- index for the monthly report: portal_hits by hit_at
+BEGIN;
+CREATE INDEX ix_portal_hits_hit_at ON portal_hits (hit_at);
+COMMIT;
+VACUUM ANALYZE portal_hits;

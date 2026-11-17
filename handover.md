@@ -441,3 +441,29 @@ ORDER BY table_name, name;
 The unique constraint on `company_name` refuses a second `Acme GmbH` spelled exactly the same, but it lets in `ACME GmbH`: `SELECT company_name, company_name = 'ACME GmbH' AS same_text FROM customers WHERE lower(btrim(company_name)) = 'acme gmbh';` prints `f`, because to PostgreSQL different capital letters make different text.
 
 In `customers.status`, `active` means a customer who still has an account with CloudByte, and `churned` means a real customer who has left; the constraint allows only those two values.
+
+## The slow report
+
+The monthly report, portal hits per day for September 2025. Every plan below was taken on this statement, with `EXPLAIN (ANALYZE, BUFFERS)` in front of it:
+
+```sql
+SELECT date_trunc('day', h.hit_at) AS day, count(*) AS hits
+FROM portal_hits h
+WHERE h.hit_at >= TIMESTAMP '2025-09-01' AND h.hit_at < TIMESTAMP '2025-10-01'
+GROUP BY day ORDER BY day;
+```
+
+| | node type | `Buffers:` under the line that names `portal_hits h` |
+|---|---|---|
+| before the index | `Seq Scan` | 1364 |
+| after the index | `Index Only Scan` | 24 |
+
+The kept index:
+
+```sql
+CREATE INDEX ix_portal_hits_hit_at ON portal_hits (hit_at);
+```
+
+Why it helps: before it, the only index on `portal_hits` was `portal_hits_pkey`, which sorts by `hit_id` first, and the report's `WHERE` tests `hit_at`, so no index could find September's rows and the scan read all 1364 pages. `ix_portal_hits_hit_at` sorts by `hit_at` first, so PostgreSQL goes straight to September's entries, and since the report reads no other column, it answers from the index alone.
+
+The before plan can't be re-run while `ix_portal_hits_hit_at` is on the table: drop `ix_portal_hits_hit_at` to see it again.
