@@ -393,3 +393,51 @@ The two queries from the first entry, run again: `SELECT count(*) AS closed, cou
 | Rows it left out | 103 | 0 |
 
 The old figure was wrong because it left out the 103 closed tickets with a blank duration, and it also counted ten tickets that later repairs deleted: four from the test accounts and six orphans.
+
+## Constraints
+
+| # | the statement | what it closes |
+|---:|---|---|
+| 1 | `ALTER TABLE tickets ADD CONSTRAINT fk_tickets_customer FOREIGN KEY (customer_ref) REFERENCES customers (customer_id);` | `## Relationships`: `tickets.customer_ref` → `customers.customer_id` |
+| 2 | `ALTER TABLE contacts ADD CONSTRAINT fk_contacts_customer FOREIGN KEY (customer_ref) REFERENCES customers (customer_id);` | `## Relationships`: `contacts.customer_ref` → `customers.customer_id` |
+| 3 | `ALTER TABLE ticket_notes ADD CONSTRAINT fk_ticket_notes_ticket FOREIGN KEY (ticket_id) REFERENCES tickets (ticket_id);` | `## Relationships`: `ticket_notes.ticket_id` → `tickets.ticket_id` |
+| 4 | `ALTER TABLE portal_hits ADD CONSTRAINT fk_portal_hits_customer FOREIGN KEY (customer_ref) REFERENCES customers (customer_id);` | `## Relationships`: `portal_hits.customer_ref` → `customers.customer_id` |
+| 5 | `ALTER TABLE portal_hits ADD CONSTRAINT fk_portal_hits_contact FOREIGN KEY (contact_ref) REFERENCES contacts (contact_id);` | `## Relationships`: `portal_hits.contact_ref` → `contacts.contact_id` |
+| 6 | `ALTER TABLE customers ADD CONSTRAINT uq_customers_company_name UNIQUE (company_name);` | `## Corrections`: Acme GmbH in `customers` twice |
+| 7 | `ALTER TABLE contacts ADD CONSTRAINT uq_contacts_customer_name UNIQUE (customer_ref, full_name);` | `## Corrections`: Contacts listed twice under the same customer |
+| 8 | `ALTER TABLE tickets ADD CONSTRAINT ck_ticket_order CHECK (closed_at IS NULL OR closed_at >= opened_at);` | `## Corrections`: Tickets closed before they opened |
+| 9 | `ALTER TABLE customers ADD CONSTRAINT ck_customer_status CHECK (status IN ('active', 'churned'));` | the sentence on the status column, below the Section 4 entries |
+
+```sql
+SELECT c.conrelid::regclass::text AS table_name, c.conname AS name,
+       CASE c.contype WHEN 'f' THEN 'foreign key' WHEN 'u' THEN 'unique' ELSE 'check' END AS kind
+  FROM pg_constraint c
+ WHERE c.connamespace = 'public'::regnamespace AND c.contype IN ('f', 'u', 'c')
+UNION ALL
+SELECT a.attrelid::regclass::text, a.attname::text, 'not null'
+  FROM pg_attribute a JOIN pg_class r ON r.oid = a.attrelid
+ WHERE r.relnamespace = 'public'::regnamespace AND r.relkind = 'r'
+   AND a.attnum > 0 AND NOT a.attisdropped AND a.attnotnull
+   AND NOT EXISTS (SELECT 1 FROM pg_constraint p
+                    WHERE p.conrelid = a.attrelid AND p.contype = 'p' AND a.attnum = ANY (p.conkey))
+ORDER BY table_name, name;
+```
+
+```
+  table_name  |           name            |    kind     
+--------------+---------------------------+-------------
+ contacts     | fk_contacts_customer      | foreign key
+ contacts     | uq_contacts_customer_name | unique
+ customers    | ck_customer_status        | check
+ customers    | uq_customers_company_name | unique
+ portal_hits  | fk_portal_hits_contact    | foreign key
+ portal_hits  | fk_portal_hits_customer   | foreign key
+ ticket_notes | fk_ticket_notes_ticket    | foreign key
+ tickets      | ck_ticket_order           | check
+ tickets      | fk_tickets_customer       | foreign key
+(9 rows)
+```
+
+The unique constraint on `company_name` refuses a second `Acme GmbH` spelled exactly the same, but it lets in `ACME GmbH`: `SELECT company_name, company_name = 'ACME GmbH' AS same_text FROM customers WHERE lower(btrim(company_name)) = 'acme gmbh';` prints `f`, because to PostgreSQL different capital letters make different text.
+
+In `customers.status`, `active` means a customer who still has an account with CloudByte, and `churned` means a real customer who has left; the constraint allows only those two values.

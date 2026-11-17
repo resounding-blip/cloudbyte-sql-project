@@ -51,3 +51,49 @@ COMMIT;
 BEGIN;
 UPDATE tickets SET resolved_minutes = round(EXTRACT(EPOCH FROM (closed_at - opened_at)) / 60) WHERE closed_at IS NOT NULL AND resolved_minutes IS NULL;
 COMMIT;
+
+-- tickets.customer_ref → customers.customer_id
+BEGIN;
+ALTER TABLE tickets ADD CONSTRAINT fk_tickets_customer
+  FOREIGN KEY (customer_ref) REFERENCES customers (customer_id);
+COMMIT;
+
+-- contacts.customer_ref → customers.customer_id
+BEGIN;
+ALTER TABLE contacts ADD CONSTRAINT fk_contacts_customer FOREIGN KEY (customer_ref) REFERENCES customers (customer_id);
+COMMIT;
+
+-- ticket_notes.ticket_id → tickets.ticket_id
+BEGIN;
+ALTER TABLE ticket_notes ADD CONSTRAINT fk_ticket_notes_ticket FOREIGN KEY (ticket_id) REFERENCES tickets (ticket_id);
+COMMIT;
+
+-- portal_hits.customer_ref → customers.customer_id
+BEGIN;
+ALTER TABLE portal_hits ADD CONSTRAINT fk_portal_hits_customer FOREIGN KEY (customer_ref) REFERENCES customers (customer_id);
+COMMIT;
+
+-- portal_hits.contact_ref → contacts.contact_id
+BEGIN;
+ALTER TABLE portal_hits ADD CONSTRAINT fk_portal_hits_contact FOREIGN KEY (contact_ref) REFERENCES contacts (contact_id);
+COMMIT;
+
+-- customers.company_name is unique
+BEGIN;
+ALTER TABLE customers ADD CONSTRAINT uq_customers_company_name UNIQUE (company_name);
+COMMIT;
+
+-- contacts (customer_ref, full_name) is unique
+BEGIN;
+ALTER TABLE contacts ADD CONSTRAINT uq_contacts_customer_name UNIQUE (customer_ref, full_name);
+COMMIT;
+
+-- tickets: closed_at on or after opened_at, or blank
+BEGIN;
+ALTER TABLE tickets ADD CONSTRAINT ck_ticket_order CHECK (closed_at IS NULL OR closed_at >= opened_at);
+COMMIT;
+
+-- customers.status is active or churned
+BEGIN;
+ALTER TABLE customers ADD CONSTRAINT ck_customer_status CHECK (status IN ('active', 'churned'));
+COMMIT;
