@@ -467,3 +467,35 @@ CREATE INDEX ix_portal_hits_hit_at ON portal_hits (hit_at);
 Why it helps: before it, the only index on `portal_hits` was `portal_hits_pkey`, which sorts by `hit_id` first, and the report's `WHERE` tests `hit_at`, so no index could find September's rows and the scan read all 1364 pages. `ix_portal_hits_hit_at` sorts by `hit_at` first, so PostgreSQL goes straight to September's entries, and since the report reads no other column, it answers from the index alone.
 
 The before plan can't be re-run while `ix_portal_hits_hit_at` is on the table: drop `ix_portal_hits_hit_at` to see it again.
+
+## The blocked session
+
+The diagnosis query, as run (with expanded display on, `\x on`, typed before it):
+
+```sql
+SELECT w.usename AS waiting, w.wait_event_type, w.wait_event, w.query AS waiting_query,
+       b.usename AS blocking, b.state AS blocking_state, b.query AS blocking_query
+FROM pg_stat_activity w
+JOIN pg_stat_activity b ON b.pid = ANY (pg_blocking_pids(w.pid))
+WHERE w.wait_event_type = 'Lock'
+  AND w.pid <> pg_backend_pid();
+```
+
+The record it printed, taken while my `UPDATE` of customer 4 waited for the lock, printed with expanded display:
+
+```
+-[ RECORD 1 ]---+-------------------------------------------------------------
+waiting         | ops_admin
+wait_event_type | Lock
+wait_event      | transactionid
+waiting_query   | UPDATE customers SET city = 'Dresden' WHERE customer_id = 4;
+blocking        | henry
+blocking_state  | idle in transaction
+blocking_query  | UPDATE customers SET city = 'Leipzig' WHERE customer_id = 4;
+```
+
+The statement that held the lock, confirmed by the person who held it as `henry`: `UPDATE customers SET city = 'Leipzig' WHERE customer_id = 4;`
+
+What I'd do about a blocking session whose transaction I can't fully see: ask the person who owns the session to end their own transaction with `COMMIT;` or `ROLLBACK;`, and not end the session myself. Ending it rolls back everything its transaction did, and `blocking_query` shows only the last statement, so I could undo work I never saw. On this instance I couldn't end it anyway: PostgreSQL refused my attempt to end `henry`'s session with `ERROR:  permission denied to terminate process`, because `ops_admin` holds neither `henry`'s privileges nor those of `pg_signal_backend`.
+
+On a quiet database, when no session waits for a lock, the diagnosis query returns no rows, so a later run prints `(0 rows)` and not this record.
