@@ -14,20 +14,20 @@ The eleven tables of `cloudbyte`, one heading each, in the order `schema.sql` de
 
 ## customers
 
-*43 rows.* `SELECT count(*) FROM customers;`
+*40 rows.* `SELECT count(*) FROM customers;`
 
 | column | what it holds | the query that proved it |
 |---|---|---|
-| `customer_id` | the customer's number, from `1` to `43` | `SELECT min(customer_id), max(customer_id), min(signed_on), max(signed_on), count(*) FROM customers;` |
-| `company_name` | the customer company's name written out, such as `Acme GmbH` | `SELECT * FROM customers ORDER BY customer_id LIMIT 3;` |
-| `city` | the customer's city, 28 distinct spellings; Berlin appears as `Berlin` 7, `Berlín` 1 and `berlin` 2 | `SELECT city, count(*) FROM customers GROUP BY city ORDER BY city;` |
-| `country` | a two-letter country code: `AT` 1, `CH` 1, `DE` 40, `SE` 1 | `SELECT country, count(*) FROM customers GROUP BY country ORDER BY country;` |
+| `customer_id` | the customer's number, from `1` to `40` | `SELECT min(customer_id), max(customer_id), min(signed_on), max(signed_on), count(*) FROM customers;` |
+| `company_name` | the customer company's name written out, such as `Acme GmbH`; the unique constraint `uq_customers_company_name` refuses an exact repeat | `SELECT * FROM customers ORDER BY customer_id LIMIT 3;` |
+| `city` | the customer's city, 26 distinct cities; Berlin is now spelled one way, `Berlin` 7 | `SELECT city, count(*) FROM customers GROUP BY city ORDER BY city;` |
+| `country` | a two-letter country code: `AT` 1, `CH` 1, `DE` 37, `SE` 1 | `SELECT country, count(*) FROM customers GROUP BY country ORDER BY country;` |
 | `signed_on` | the day the customer signed, from `2023-01-17` to `2025-04-08` | `SELECT min(customer_id), max(customer_id), min(signed_on), max(signed_on), count(*) FROM customers;` |
-| `plan` | one of three plans: `basic` 16, `enterprise` 9, `standard` 18 | `SELECT plan, count(*) FROM customers GROUP BY plan ORDER BY plan;` |
-| `status` | `active` 38 or `churned` 5 | `SELECT status, count(*) FROM customers GROUP BY status ORDER BY status;` |
-| `contact_1_email` | the customer's first contact's email address, filled on 41 of the 43 customers | `SELECT count(*) FILTER (WHERE contact_1_email <> '') AS has_1, count(*) FILTER (WHERE contact_2_email <> '') AS has_2, count(*) FILTER (WHERE contact_3_email <> '') AS has_3 FROM customers;` |
-| `contact_2_email` | a second contact's email address, filled on 29 of the 43 | `SELECT count(*) FILTER (WHERE contact_1_email <> '') AS has_1, count(*) FILTER (WHERE contact_2_email <> '') AS has_2, count(*) FILTER (WHERE contact_3_email <> '') AS has_3 FROM customers;` |
-| `contact_3_email` | a third contact's email address, filled on 2 of the 43. A fourth contact has nowhere to go: no column holds one, and finding a customer by a contact's email means searching all three columns | `SELECT count(*) FILTER (WHERE contact_1_email <> '') AS has_1, count(*) FILTER (WHERE contact_2_email <> '') AS has_2, count(*) FILTER (WHERE contact_3_email <> '') AS has_3 FROM customers;` |
+| `plan` | one of three plans: `basic` 14, `enterprise` 8, `standard` 18 | `SELECT plan, count(*) FROM customers GROUP BY plan ORDER BY plan;` |
+| `status` | `active` 35 or `churned` 5; the check constraint `ck_customer_status` allows only these two values | `SELECT status, count(*) FROM customers GROUP BY status ORDER BY status;` |
+| `contact_1_email` | the customer's first contact's email address, filled on 40 of the 40 customers | `SELECT count(*) FILTER (WHERE contact_1_email <> '') AS has_1, count(*) FILTER (WHERE contact_2_email <> '') AS has_2, count(*) FILTER (WHERE contact_3_email <> '') AS has_3 FROM customers;` |
+| `contact_2_email` | a second contact's email address, filled on 29 of the 40 | `SELECT count(*) FILTER (WHERE contact_1_email <> '') AS has_1, count(*) FILTER (WHERE contact_2_email <> '') AS has_2, count(*) FILTER (WHERE contact_3_email <> '') AS has_3 FROM customers;` |
+| `contact_3_email` | a third contact's email address, filled on 2 of the 40. A fourth contact has nowhere to go: no column holds one, and finding a customer by a contact's email means searching all three columns | `SELECT count(*) FILTER (WHERE contact_1_email <> '') AS has_1, count(*) FILTER (WHERE contact_2_email <> '') AS has_2, count(*) FILTER (WHERE contact_3_email <> '') AS has_3 FROM customers;` |
 
 ## pricing
 
@@ -56,42 +56,42 @@ The eleven tables of `cloudbyte`, one heading each, in the order `schema.sql` de
 
 ## contacts
 
-*87 rows.* `SELECT count(*) FROM contacts;`
+*82 rows.* `SELECT count(*) FROM contacts;`
 
 | column | what it holds | the query that proved it |
 |---|---|---|
 | `contact_id` | the contact's number, from `701` to `787` | `SELECT min(contact_id), max(contact_id), min(customer_ref), max(customer_ref), count(*) FROM contacts;` |
-| `customer_ref` | a customer number, from `1` to `41` | `SELECT min(contact_id), max(contact_id), min(customer_ref), max(customer_ref), count(*) FROM contacts;` |
-| `full_name` | a person's first and last name, such as `Jörg Baumgart` | `SELECT * FROM contacts ORDER BY contact_id LIMIT 3;` |
+| `customer_ref` | a customer number, from `1` to `40`; the foreign key `fk_contacts_customer` requires each to be a `customers.customer_id` | `SELECT min(contact_id), max(contact_id), min(customer_ref), max(customer_ref), count(*) FROM contacts;` |
+| `full_name` | a person's first and last name, such as `Jörg Baumgart`; the unique constraint `uq_contacts_customer_name` refuses the same name twice under one customer | `SELECT * FROM contacts ORDER BY contact_id LIMIT 3;` |
 | `email` | the person's email address, `first.last@company.example` | `SELECT * FROM contacts ORDER BY contact_id LIMIT 3;` |
-| `role` | one of three roles, 29 each: `admin`, `billing`, `technical` | `SELECT role, count(*) FROM contacts GROUP BY role ORDER BY role;` |
+| `role` | one of three roles: `admin` 28, `billing` 28, `technical` 26 | `SELECT role, count(*) FROM contacts GROUP BY role ORDER BY role;` |
 
 ## tickets
 
-*925 rows.* `SELECT count(*) FROM tickets;`
+*915 rows.* `SELECT count(*) FROM tickets;`
 
 | column | what it holds | the query that proved it |
 |---|---|---|
-| `ticket_id` | the ticket's number, from `3001` to `3925` | `SELECT min(ticket_id), max(ticket_id), min(customer_ref), max(customer_ref), min(opened_at), max(opened_at), min(closed_at), max(closed_at), min(resolved_minutes), max(resolved_minutes), count(*) FROM tickets;` |
-| `customer_ref` | a customer number, from `1` to `46` | `SELECT min(ticket_id), max(ticket_id), min(customer_ref), max(customer_ref), min(opened_at), max(opened_at), min(closed_at), max(closed_at), min(resolved_minutes), max(resolved_minutes), count(*) FROM tickets;` |
-| `category` | one of five words: `access` 182, `billing` 203, `network` 192, `performance` 162, `storage` 186 | `SELECT category, count(*) FROM tickets GROUP BY category ORDER BY category;` |
-| `st_flag_2` | **Not proved:** a number from 1 to 4 that looks like how slow a ticket was to resolve. Per value, `resolved_minutes` runs: `1` 235 tickets, 20 to 239; `2` 225, 129 to 1440; `3` 249, 604 to 7157; `4` 216, 1496 to 20045. The ranges overlap, so no rule sets it | `SELECT st_flag_2, count(*), min(resolved_minutes), max(resolved_minutes) FROM tickets GROUP BY st_flag_2 ORDER BY st_flag_2;` |
+| `ticket_id` | the ticket's number, from `3001` to `3915` | `SELECT min(ticket_id), max(ticket_id), min(customer_ref), max(customer_ref), min(opened_at), max(opened_at), min(closed_at), max(closed_at), min(resolved_minutes), max(resolved_minutes), count(*) FROM tickets;` |
+| `customer_ref` | a customer number, from `1` to `40`; the foreign key `fk_tickets_customer` requires each to be a `customers.customer_id` | `SELECT min(ticket_id), max(ticket_id), min(customer_ref), max(customer_ref), min(opened_at), max(opened_at), min(closed_at), max(closed_at), min(resolved_minutes), max(resolved_minutes), count(*) FROM tickets;` |
+| `category` | one of five words: `access` 181, `billing` 200, `network` 190, `performance` 160, `storage` 184 | `SELECT category, count(*) FROM tickets GROUP BY category ORDER BY category;` |
+| `st_flag_2` | **Not proved:** a number from 1 to 4 that looks like how slow a ticket was to resolve. Per value, `resolved_minutes` runs: `1` 232 tickets, 20 to 239; `2` 223, 129 to 1440; `3` 245, 604 to 7157; `4` 215, 1496 to 20045. The ranges overlap, so no rule sets it | `SELECT st_flag_2, count(*), min(resolved_minutes), max(resolved_minutes) FROM tickets GROUP BY st_flag_2 ORDER BY st_flag_2;` |
 | `opened_at` | when the ticket was opened, from `2024-01-02 11:14` to `2025-12-31 08:07` | `SELECT min(ticket_id), max(ticket_id), min(customer_ref), max(customer_ref), min(opened_at), max(opened_at), min(closed_at), max(closed_at), min(resolved_minutes), max(resolved_minutes), count(*) FROM tickets;` |
-| `closed_at` | when the ticket was closed, from `2024-01-03 13:19` to `2025-12-29 07:25` | `SELECT min(ticket_id), max(ticket_id), min(customer_ref), max(customer_ref), min(opened_at), max(opened_at), min(closed_at), max(closed_at), min(resolved_minutes), max(resolved_minutes), count(*) FROM tickets;` |
-| `resolved_minutes` | minutes to resolve, from `20` to `20045` | `SELECT min(ticket_id), max(ticket_id), min(customer_ref), max(customer_ref), min(opened_at), max(opened_at), min(closed_at), max(closed_at), min(resolved_minutes), max(resolved_minutes), count(*) FROM tickets;` |
-| `assigned_to` | a staff username, 12 names from `alice` 83 to `leo` 74 | `SELECT assigned_to, count(*) FROM tickets GROUP BY assigned_to ORDER BY assigned_to;` |
+| `closed_at` | when the ticket was closed, from `2024-01-03 13:19` to `2025-12-29 07:25`, blank while the ticket is open; the check constraint `ck_ticket_order` keeps it on or after `opened_at` | `SELECT min(ticket_id), max(ticket_id), min(customer_ref), max(customer_ref), min(opened_at), max(opened_at), min(closed_at), max(closed_at), min(resolved_minutes), max(resolved_minutes), count(*) FROM tickets;` |
+| `resolved_minutes` | minutes to resolve, from `20` to `20045`, filled on every closed ticket | `SELECT min(ticket_id), max(ticket_id), min(customer_ref), max(customer_ref), min(opened_at), max(opened_at), min(closed_at), max(closed_at), min(resolved_minutes), max(resolved_minutes), count(*) FROM tickets;` |
+| `assigned_to` | a staff username, 12 names from `alice` 82 to `leo` 73 | `SELECT assigned_to, count(*) FROM tickets GROUP BY assigned_to ORDER BY assigned_to;` |
 
 ## ticket_notes
 
-*3246 rows.* `SELECT count(*) FROM ticket_notes;`
+*3208 rows.* `SELECT count(*) FROM ticket_notes;`
 
 | column | what it holds | the query that proved it |
 |---|---|---|
-| `note_id` | the note's number, from `40001` to `43246` | `SELECT min(note_id), max(note_id), min(ticket_id), max(ticket_id), min(note_at), max(note_at), count(*) FROM ticket_notes;` |
-| `ticket_id` | a ticket number, from `3001` to `3925` | `SELECT min(note_id), max(note_id), min(ticket_id), max(ticket_id), min(note_at), max(note_at), count(*) FROM ticket_notes;` |
-| `author` | a staff username, the same 12 names as `tickets.assigned_to`, `alice` 238 to `leo` 261 | `SELECT author, count(*) FROM ticket_notes GROUP BY author ORDER BY author;` |
+| `note_id` | the note's number, from `40001` to `43208` | `SELECT min(note_id), max(note_id), min(ticket_id), max(ticket_id), min(note_at), max(note_at), count(*) FROM ticket_notes;` |
+| `ticket_id` | a ticket number, from `3001` to `3915`; the foreign key `fk_ticket_notes_ticket` requires each to be a `tickets.ticket_id` | `SELECT min(note_id), max(note_id), min(ticket_id), max(ticket_id), min(note_at), max(note_at), count(*) FROM ticket_notes;` |
+| `author` | a staff username, the same 12 names as `tickets.assigned_to`, `alice` 235 to `leo` 259 | `SELECT author, count(*) FROM ticket_notes GROUP BY author ORDER BY author;` |
 | `note_at` | when the note was written, from `2024-01-03 09:14` to `2026-01-02 13:22` | `SELECT min(note_id), max(note_id), min(ticket_id), max(ticket_id), min(note_at), max(note_at), count(*) FROM ticket_notes;` |
-| `body` | one of eight stock sentences, such as `Waiting on the customer.` 390 and `Escalated to engineering.` 372 | `SELECT body, count(*) FROM ticket_notes GROUP BY body ORDER BY body;` |
+| `body` | one of eight stock sentences, such as `Waiting on the customer.` 387 and `Escalated to engineering.` 366 | `SELECT body, count(*) FROM ticket_notes GROUP BY body ORDER BY body;` |
 
 ## portal_hits
 
@@ -100,8 +100,8 @@ The eleven tables of `cloudbyte`, one heading each, in the order `schema.sql` de
 | column | what it holds | the query that proved it |
 |---|---|---|
 | `hit_id` | the hit's number, from `1` to `135877` | `SELECT min(hit_id), max(hit_id), min(customer_ref), max(customer_ref), min(contact_ref), max(contact_ref), min(hit_at), max(hit_at), min(duration_ms), max(duration_ms), count(*) FROM portal_hits;` |
-| `customer_ref` | a customer number, from `1` to `41` | `SELECT min(hit_id), max(hit_id), min(customer_ref), max(customer_ref), min(contact_ref), max(contact_ref), min(hit_at), max(hit_at), min(duration_ms), max(duration_ms), count(*) FROM portal_hits;` |
-| `contact_ref` | a contact number, from `701` to `787` | `SELECT min(hit_id), max(hit_id), min(customer_ref), max(customer_ref), min(contact_ref), max(contact_ref), min(hit_at), max(hit_at), min(duration_ms), max(duration_ms), count(*) FROM portal_hits;` |
+| `customer_ref` | a customer number, from `1` to `40`; the foreign key `fk_portal_hits_customer` requires each to be a `customers.customer_id` | `SELECT min(hit_id), max(hit_id), min(customer_ref), max(customer_ref), min(contact_ref), max(contact_ref), min(hit_at), max(hit_at), min(duration_ms), max(duration_ms), count(*) FROM portal_hits;` |
+| `contact_ref` | a contact number, from `701` to `787`; the foreign key `fk_portal_hits_contact` requires each to be a `contacts.contact_id` | `SELECT min(hit_id), max(hit_id), min(customer_ref), max(customer_ref), min(contact_ref), max(contact_ref), min(hit_at), max(hit_at), min(duration_ms), max(duration_ms), count(*) FROM portal_hits;` |
 | `hit_at` | when the page was requested, from `2024-01-01 06:02:53` to `2025-11-28 20:57:12` | `SELECT min(hit_id), max(hit_id), min(customer_ref), max(customer_ref), min(contact_ref), max(contact_ref), min(hit_at), max(hit_at), min(duration_ms), max(duration_ms), count(*) FROM portal_hits;` |
 | `path` | one of ten portal pages, `/account` 13388 to `/support/new` 13515 | `SELECT path, count(*) FROM portal_hits GROUP BY path ORDER BY path;` |
 | `status_code` | an HTTP status: `200` 122419, `404` 6636, `500` 6822 | `SELECT status_code, count(*) FROM portal_hits GROUP BY status_code ORDER BY status_code;` |
@@ -110,6 +110,8 @@ The eleven tables of `cloudbyte`, one heading each, in the order `schema.sql` de
 `portal_hits` stopped being filled early: its last visit is at `2025-11-28 20:57:12`, while the support desk's last ticket was opened at `2025-12-31 08:07:00`, so the portal's visits from 29 November 2025 on are missing. Found with `SELECT max(hit_at) AS last_hit FROM portal_hits;` and `SELECT max(opened_at) AS last_ticket FROM tickets;`
 
 ## Relationships
+
+*These counts were taken in Section 3, on the database as loaded, before any repair; the figures for the database now are in the table headings above and under `## Corrections`.*
 
 | relationship | `INNER JOIN` rows | `LEFT JOIN` rows | the queries that proved it |
 |---|---|---|---|
@@ -499,3 +501,7 @@ The statement that held the lock, confirmed by the person who held it as `henry`
 What I'd do about a blocking session whose transaction I can't fully see: ask the person who owns the session to end their own transaction with `COMMIT;` or `ROLLBACK;`, and not end the session myself. Ending it rolls back everything its transaction did, and `blocking_query` shows only the last statement, so I could undo work I never saw. On this instance I couldn't end it anyway: PostgreSQL refused my attempt to end `henry`'s session with `ERROR:  permission denied to terminate process`, because `ops_admin` holds neither `henry`'s privileges nor those of `pg_signal_backend`.
 
 On a quiet database, when no session waits for a lock, the diagnosis query returns no rows, so a later run prints `(0 rows)` and not this record.
+
+## For a reader who does not read SQL
+
+The customer and support records we inherited had several faults: Berlin was typed three different ways, Acme GmbH was in the customer list twice, some contact people were listed twice under the same company, two test accounts sat among the real customers, six support tickets belonged to customers that did not exist, two tickets were closed five hours before they were opened, and 101 closed tickets had no time to resolve recorded. All of these are now fixed, and the database now refuses the same mistakes if anyone tries to make them again. One thing can't be fixed: we don't know when those two backwards tickets really closed, so their closing times are worked out from the time each one took, not taken from a record. Because of the repairs, we now count 40 customers instead of 43 and 915 tickets instead of 925, and the average time to resolve a closed ticket is now about 3,652 minutes, roughly two and a half days, where before the repairs it read about 3,571 minutes, because it now counts every closed ticket.
