@@ -504,6 +504,8 @@ On a quiet database, when no session waits for a lock, the diagnosis query retur
 
 ## For a reader who does not read SQL
 
+Start with `## Corrections`: it says which published figures changed.
+
 The customer and support records we inherited had several faults: Berlin was typed three different ways, Acme GmbH was in the customer list twice, some contact people were listed twice under the same company, two test accounts sat among the real customers, six support tickets belonged to customers that did not exist, two tickets were closed five hours before they were opened, and 101 closed tickets had no time to resolve recorded. All of these are now fixed. The database now refuses some of the same mistakes if anyone tries them again: the exact same company name twice, the same person twice under one company, a ticket that closes before it opens, a customer that is neither active nor churned, and a ticket, contact or website visit linked to a customer, ticket or contact that doesn't exist. It still lets in a closed ticket with no time to resolve, a new spelling of a city, and a test account, so those need checking by hand. One thing can't be fixed: we don't know when those two backwards tickets really closed, so their closing times are worked out from the time each one took, not taken from a record. Because of the repairs, we now count 40 customers instead of 43 and 915 tickets instead of 925, and the average time to resolve a closed ticket is now about 3,652 minutes, roughly two and a half days, where before the repairs it read about 3,571 minutes, because it now counts every closed ticket.
 
 ## Reproducing this
